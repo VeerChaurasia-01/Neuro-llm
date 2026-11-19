@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function AnalyzePage() {
-  const { loadSampleData, clearForm, eegImage, clinicalData } = useAnalysis();
+  const { loadSampleData, loadNormalData, clearForm, eegImage, clinicalData } = useAnalysis();
   const { user, isAuthenticated, openAuthModal } = useAuth();
 
   const hasContent = Boolean(
@@ -104,7 +104,16 @@ export default function AnalyzePage() {
               className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl text-burgundy-800 dark:text-rose-300 bg-burgundy-50 hover:bg-burgundy-100 dark:bg-burgundy-950/60 dark:hover:bg-burgundy-900/60 border border-burgundy-200/70 dark:border-burgundy-800/70 transition-colors shadow-2xs"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Load Verified Sample Case</span>
+              <span>Load Seizure Case</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={loadNormalData}
+              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-300 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors shadow-2xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Load Normal Control</span>
             </button>
 
             {hasContent && (

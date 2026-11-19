@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { SAMPLE_SPECTROGRAM, SAMPLE_CLINICAL_DATA } from '../constants/presets';
+import { SAMPLE_SPECTROGRAM, SAMPLE_CLINICAL_DATA, NORMAL_CLINICAL_DATA } from '../constants/presets';
+import { runMultimodalDetection } from '../utils/detector';
 
 export const AnalysisContext = createContext(null);
 
@@ -50,6 +51,9 @@ export function AnalysisProvider({ children }) {
     {
       id: 'NLLM-8912',
       timestamp: '2026-10-10 10:45 AM',
+      evaluator: 'Dr. Elena Vance (Demo Evaluator)',
+      evaluatorRole: 'Chief Epileptologist',
+      evaluatorInstitution: 'Johns Hopkins Comprehensive Epilepsy Center',
       imageName: 'eeg_patient_sample.png',
       imageUrl: '/sample-spectrogram.png',
       imageDimensions: '640 × 320',
@@ -67,6 +71,11 @@ export function AnalysisProvider({ children }) {
         clinicalProvided: true,
         tokensAligned: 384,
         confidenceScore: 0.942,
+        dominantBand: 'Delta / Theta (<8 Hz)',
+        deltaThetaRatio: 64,
+        alphaBetaRatio: 26,
+        gammaRatio: 10,
+        timeWindow: '10s – 18s',
       }
     }
   ]);
@@ -108,6 +117,13 @@ export function AnalysisProvider({ children }) {
     setValidationError(null);
   };
 
+  // Pre-load normal control case
+  const loadNormalData = () => {
+    setEegImage(SAMPLE_SPECTROGRAM);
+    setClinicalData(NORMAL_CLINICAL_DATA);
+    setValidationError(null);
+  };
+
   // Remove uploaded image
   const removeImage = () => {
     setEegImage(null);
@@ -135,8 +151,8 @@ export function AnalysisProvider({ children }) {
     setCurrentResult(null);
   };
 
-  // Run simulated analysis
-  const runAnalysis = () => {
+  // Run multimodal analysis
+  const runAnalysis = async () => {
     if (!eegImage) {
       setValidationError('Please upload an EEG spectrogram image before starting analysis.');
       const uploadCard = document.getElementById('eeg-upload-section');
@@ -160,76 +176,80 @@ export function AnalysisProvider({ children }) {
       });
     }, 450);
 
-    setTimeout(() => {
-      clearInterval(stepInterval);
-      setIsAnalyzing(false);
-
-      const hasClinicalInfo = Boolean(
-        clinicalData.patientHistory || clinicalData.symptoms || clinicalData.medicationInfo
-      );
-
-      const isSeizure = Math.random() > 0.25 || eegImage.name.toLowerCase().includes('seizure') || eegImage.name.toLowerCase().includes('spectrogram');
-      const confidence = isSeizure ? Number((91 + Math.random() * 7).toFixed(1)) : Number((84 + Math.random() * 11).toFixed(1));
-      const id = `NLLM-${Math.floor(1000 + Math.random() * 9000)}`;
-      
-      const now = new Date();
-      const timestamp = now.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      let activeUser = null;
-      try {
-        const savedAuth = localStorage.getItem('neuro_llm_auth_user');
-        if (savedAuth) activeUser = JSON.parse(savedAuth);
-      } catch (err) {
-        console.error('Failed to read auth user', err);
-      }
-
-      const newResult = {
-        id,
-        timestamp,
-        evaluator: activeUser ? activeUser.name : 'Dr. Elena Vance (Demo Evaluator)',
-        evaluatorRole: activeUser ? activeUser.role : 'Chief Epileptologist',
-        evaluatorInstitution: activeUser ? activeUser.institution : 'Johns Hopkins Comprehensive Epilepsy Center',
-        imageName: eegImage.name,
-        imageUrl: eegImage.url,
-        imageDimensions: eegImage.dimensions || '224 × 224',
-        imageSize: eegImage.size || '150 KB',
-        classification: isSeizure ? 'Seizure Detected' : 'Non-Seizure Pattern',
-        confidence,
-        patientHistory: clinicalData.patientHistory,
-        symptoms: clinicalData.symptoms,
-        medicationInfo: clinicalData.medicationInfo,
-        additionalNotes: clinicalData.additionalNotes,
-        interpretation: isSeizure
-          ? `Multimodal cross-attention fused the 2D spectrogram visual tokens with clinical text features. The model identified prominent low-frequency spectral power (<8 Hz) correlating with rhythmic epileptiform patterns. Clinical context (${hasClinicalInfo ? 'loss of awareness semiology & anti-seizure medication' : 'unspecified clinical background'}) supports focal/generalized ictal onset.`
-          : 'Multimodal cross-attention detected background physiological rhythms without sustained paroxysmal spike-wave complexes or focal slowing. Spectral power remains distributed across normal alpha and beta frequencies without epileptiform synchronization.',
-        spectralEvidence: isSeizure
-          ? 'Synchronized high-power spectral density concentrated in the 0–15 Hz band with rhythmic burst progression.'
-          : 'Homogeneous frequency dispersion consistent with normal non-epileptic baseline EEG spectrogram features.',
-        modalityDetails: {
-          eegProvided: true,
-          clinicalProvided: hasClinicalInfo,
-          tokensAligned: hasClinicalInfo ? 412 : 196,
-          confidenceScore: confidence / 100,
-        }
-      };
-
-      setCurrentResult(newResult);
-      setHistory(prev => [newResult, ...prev]);
+    try {
+      const detectionResult = await runMultimodalDetection(eegImage, clinicalData);
 
       setTimeout(() => {
-        const resultsEl = document.getElementById('results-section');
-        if (resultsEl) {
-          resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 100);
+        clearInterval(stepInterval);
+        setIsAnalyzing(false);
 
-    }, 2000);
+        const id = `NLLM-${Math.floor(1000 + Math.random() * 9000)}`;
+        
+        const now = new Date();
+        const timestamp = now.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        let activeUser = null;
+        try {
+          const savedAuth = localStorage.getItem('neuro_llm_auth_user');
+          if (savedAuth) activeUser = JSON.parse(savedAuth);
+        } catch (err) {
+          console.error('Failed to read auth user', err);
+        }
+
+        const newResult = {
+          id,
+          timestamp,
+          evaluator: activeUser ? activeUser.name : 'Dr. Elena Vance (Demo Evaluator)',
+          evaluatorRole: activeUser ? activeUser.role : 'Chief Epileptologist',
+          evaluatorInstitution: activeUser ? activeUser.institution : 'Johns Hopkins Comprehensive Epilepsy Center',
+          imageName: eegImage.name,
+          imageUrl: eegImage.url,
+          imageDimensions: eegImage.dimensions || '640 × 320',
+          imageSize: eegImage.size || '182 KB',
+          classification: detectionResult.classification,
+          confidence: detectionResult.confidence,
+          patientHistory: clinicalData.patientHistory,
+          symptoms: clinicalData.symptoms,
+          medicationInfo: clinicalData.medicationInfo,
+          additionalNotes: clinicalData.additionalNotes,
+          interpretation: detectionResult.interpretation,
+          spectralEvidence: detectionResult.spectralEvidence,
+          modalityDetails: {
+            eegProvided: true,
+            clinicalProvided: detectionResult.clinicalFeats.hasClinicalNotes,
+            tokensAligned: detectionResult.tokenAlignment,
+            confidenceScore: detectionResult.confidence / 100,
+            dominantBand: detectionResult.visualFeats.dominantBand,
+            deltaThetaRatio: detectionResult.visualFeats.deltaThetaRatio,
+            alphaBetaRatio: detectionResult.visualFeats.alphaBetaRatio,
+            gammaRatio: detectionResult.visualFeats.gammaRatio,
+            timeWindow: detectionResult.visualFeats.timeWindow,
+            peakBurstRatio: detectionResult.visualFeats.peakBurstRatio,
+          }
+        };
+
+        setCurrentResult(newResult);
+        setHistory(prev => [newResult, ...prev]);
+
+        setTimeout(() => {
+          const resultsEl = document.getElementById('results-section');
+          if (resultsEl) {
+            resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+
+      }, 1900);
+    } catch (err) {
+      console.error('Detection failed', err);
+      clearInterval(stepInterval);
+      setIsAnalyzing(false);
+    }
   };
 
   // View specific history record
@@ -264,6 +284,7 @@ export function AnalysisProvider({ children }) {
         eegImage,
         handleImageUpload,
         loadSampleData,
+        loadNormalData,
         removeImage,
         clinicalData,
         updateClinicalField,

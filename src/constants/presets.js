@@ -12,3 +12,10 @@ export const SAMPLE_CLINICAL_DATA = {
   medicationInfo: 'Currently on valproate 500 mg twice daily.',
   additionalNotes: 'No history of head trauma. EEG requested for evaluation of seizure activity.',
 };
+
+export const NORMAL_CLINICAL_DATA = {
+  patientHistory: '28-year-old female with no previous neurological episodes. Routine pre-employment baseline EEG screening.',
+  symptoms: 'Reports occasional tension headaches after prolonged screen time. No loss of consciousness or involuntary motor activity.',
+  medicationInfo: 'No anti-epileptic or neuroactive medications. Takes occasional multivitamin.',
+  additionalNotes: 'Patient was relaxed with eyes closed during recording. Well-regulated awake background.',
+};
